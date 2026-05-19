@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import sys
 import os
 
@@ -35,23 +36,33 @@ class Data_Preprocessor():
             return self.clean_df
         
         return self.clean_df
+    
+class Whale_Alpha_Engine():
+    def __init__(self, clean_df):
+        self.clean_df = clean_df
+        self.aggregated_df = pd.DataFrame()
+    
+    def calculate_metrics(self):
+        self.clean_df["dollar_volume"] = self.clean_df["price"] * self.clean_df["size"]
+        self.clean_df["directional_volume"] = np.where(self.clean_df["side"] == "BUY", self.clean_df["dollar_volume"], -self.clean_df["dollar_volume"])
 
+        self.aggregated_df = self.clean_df.groupby("maker_address").agg(
+            trade_count = ("id", "count"),
+            total_volume = ("dollar_volume", "sum"),
+            net_volume = ("directional_volume", "sum")
+        ).reset_index()
 
+        self.aggregated_df["avg_trade_size"] = self.aggregated_df["total_volume"] / self.aggregated_df["trade_count"]
+        self.aggregated_df["volume_skew"] = self.aggregated_df["net_volume"] / self.aggregated_df["total_volume"]
 
+    def get_elite_whales(self, min_volume, min_avg_size, min_skew):
+        whale_mask = (
+            (self.aggregated_df["total_volume"] > min_volume) &
+            (self.aggregated_df["avg_trade_size"] > min_avg_size) &
+            (self.aggregated_df["volume_skew"].abs() > min_skew) 
+        )
 
+        final_df = self.aggregated_df[whale_mask]
 
-
-
-if __name__ == "__main__":
-    condition_id = polymarket.get_market_condition_id("ky-04-republican-primary-winner")
-
-    print(condition_id)
-
-    top_trades = polymarket.get_market_trades(condition_id)
-
-    print(top_trades)
-
-
-## Three directional markets 1. intensity 2. consistency 3. directional conviction
-
+        return final_df.sort_values(by="total_volume", ascending = False)
 

@@ -86,6 +86,19 @@ def get_user_positons(user):
         return user_positions
     else:
         return []
+    
+def get_user_trades(wallet_address):
+    endpoint = f"{POLYMARKET_DATA_URL}/allTradesForUser"
+    response = requests.get(endpoint, params={"hash": wallet_address})
+
+    if response.status_code == 200:
+        payload = response.json()
+        if isinstance(payload, list):
+            return payload
+        elif isinstance(payload, dict):
+            return payload.get("data", [])
+            
+    return []
 
 
 
