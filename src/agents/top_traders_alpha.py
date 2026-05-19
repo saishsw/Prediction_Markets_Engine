@@ -4,9 +4,9 @@ import sys
 import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, '../../..'))
+project_root = os.path.abspath(os.path.join(current_dir, '../..'))
 sys.path.append(project_root)
-sys.path.append(os.path.join(project_root, 'src', 'prediction_markets_agent'))
+sys.path.append(os.path.join(project_root, 'src'))
 
 from api import polymarket
 
