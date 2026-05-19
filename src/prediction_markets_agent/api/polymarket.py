@@ -38,7 +38,7 @@ def get_market_token_ids(slug):
     else:
         return {}
     
-def get_market_condition_ids(slug):
+def get_market_condition_id(slug):
     endpoint = f"{POLYMARKET_GAMMA_URL}/events"
     response = requests.get(endpoint, params = {"slug" : slug})
 
@@ -70,7 +70,10 @@ def get_market_trades(condition_id, limit = 100):
 
     if response.status_code == 200:
         payload = response.json()
-        return payload.get("data", [])
+        if isinstance(payload, list):
+            return payload
+        elif isinstance(payload, dict):
+            return payload.get("data", [])
     else:
         return []
 
