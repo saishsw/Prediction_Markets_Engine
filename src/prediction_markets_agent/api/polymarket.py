@@ -7,7 +7,7 @@ POLYMARKET_GAMMA_URL = "https://gamma-api.polymarket.com"
 
 def get_live_orderbook(token_id):
     endpoint = f"{POLYMARKET_CLOB_URL}/book"
-    response = requests.get(endpoint, params = {"token_id" : id})
+    response = requests.get(endpoint, params = {"token_id" : token_id})
 
     if response.status_code == 200:
         orderbook_dict = response.json()
@@ -64,18 +64,33 @@ def get_recent_public_trades(limit = 100):
     else:
         return {}
         
-def get_market_trades(condition_id, limit = 100):
+def get_market_trades(condition_id, target_depth):
     endpoint = f"{POLYMARKET_DATA_URL}/trades"
-    response = requests.get(endpoint, params = {"market" : condition_id, "limit" : limit} )
+    total_trades = []
+    current_offset = 0
 
-    if response.status_code == 200:
-        payload = response.json()
-        if isinstance(payload, list):
-            return payload
-        elif isinstance(payload, dict):
-            return payload.get("data", [])
-    else:
-        return []
+    while len(total_trades) < target_depth:
+        params = {
+            "market" : condition_id,
+            "limit" : 500,
+            "offset" : current_offset
+        }
+        response = requests.get(endpoint, params)
+
+        if response.status_code != 200:
+            print(f"Network degradation or rate limit hit at offset {current_offset}")
+
+            break
+
+        else:
+            payload = response.json()
+            batch = payload if isinstance(payload, list) else payload.get("data", [])
+            if not batch:
+                break
+            total_trades.extend(batch)
+            current_offset += 500
+    
+    return total_trades[:target_depth]
 
 def get_user_positons(user):
     endpoint = f"{POLYMARKET_DATA_URL}/positions"
