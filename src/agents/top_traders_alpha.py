@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import sys
 import os
+import logging
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '../..'))
@@ -9,6 +10,9 @@ sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'src'))
 
 from api import polymarket
+
+
+logger = logging.getLogger(__name__)
 
 class Data_Preprocessor():
     def __init__(self, raw_top_market_trades):
@@ -21,6 +25,12 @@ class Data_Preprocessor():
 
     def clean_and_parse(self, target_outcome=None):
         if self.raw_df.empty:
+            return pd.DataFrame()
+
+        required_columns = {"price", "size", "outcome", "side"}
+        missing_columns = required_columns - set(self.clean_df.columns)
+        if missing_columns:
+            logger.warning("Preprocessor missing required columns: %s", sorted(missing_columns))
             return pd.DataFrame()
                 
         rename_map = {
@@ -35,10 +45,19 @@ class Data_Preprocessor():
         if "id" not in self.clean_df.columns:
             self.clean_df["id"] = self.clean_df.index.astype(str)
 
-        self.clean_df[["price", "size"]] = self.clean_df[["price", "size"]].astype(float)
+        self.clean_df[["price", "size"]] = self.clean_df[["price", "size"]].apply(pd.to_numeric, errors="coerce")
+        self.clean_df = self.clean_df.dropna(subset=["price", "size", "outcome", "side"])
+
+        if self.clean_df.empty:
+            return pd.DataFrame()
 
         valid_size_mask = self.clean_df["size"] > 0
         self.clean_df = self.clean_df[valid_size_mask]
+
+        if self.clean_df.empty:
+            return pd.DataFrame()
+
+        selected_target = None
 
         if "outcome" in self.clean_df.columns and not self.clean_df.empty:
             if target_outcome is None:
@@ -46,30 +65,36 @@ class Data_Preprocessor():
             else:
                 unique_outcomes = self.clean_df["outcome"].unique()
                 match_generator = [o for o in unique_outcomes if str(o).upper() == str(target_outcome).upper()]
-        
-            if match_generator:
-                selected_target = match_generator[0]
-            else:
-                return pd.DataFrame()
+                if match_generator:
+                    selected_target = match_generator[0]
+                else:
+                    return pd.DataFrame()
+        else:
+            return pd.DataFrame()
             
         valid_outcome_mask = self.clean_df["outcome"] == selected_target
         self.clean_df = self.clean_df[valid_outcome_mask]
+
+        if self.clean_df.empty:
+            return pd.DataFrame()
 
 
         try:
             self.clean_df = self.clean_df[["id", "maker_address", "side", "outcome", "price", "size"]]
         except KeyError as e:
+            logger.warning("Preprocessor could not select required columns: %s", e)
             return pd.DataFrame()
         
         return self.clean_df
     
 class Whale_Alpha_Engine():
-    def __init__(self, clean_df):
-        self.clean_df = clean_df
+    def __init__(self, clean_df=None):
+        self.clean_df = clean_df if clean_df is not None else pd.DataFrame()
         self.aggregated_df = pd.DataFrame()
     
     def calculate_metrics(self):
-        if self.clean_df.empty: return 
+        if self.clean_df.empty:
+            return 
 
         self.clean_df["dollar_volume"] = self.clean_df["price"] * self.clean_df["size"]
         self.clean_df["directional_volume"] = np.where(self.clean_df["side"] == "BUY", self.clean_df["dollar_volume"], -self.clean_df["dollar_volume"])
@@ -116,6 +141,8 @@ class Whale_Alpha_Engine():
         for _, whale in elite_whales_df.iterrows():
             address = whale['maker_address']
             whale_ledger = self.clean_df[self.clean_df['maker_address'] == address]
+            if whale_ledger.empty:
+                continue
             latest_trade = whale_ledger.iloc[-1]
             action_verb = "BUY" if latest_trade['side'] == "BUY" else "SELL"
 
