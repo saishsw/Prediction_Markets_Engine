@@ -84,22 +84,33 @@ def get_recent_public_trades(limit=100):
 
         if response.status_code == 200:
             payload = response.json()
-            return payload.get("data", [])
+            if isinstance(payload, list):
+                return payload
+            if isinstance(payload, dict):
+                return payload.get("data", [])
     except requests.exceptions.RequestException as exc:
         logger.warning("Recent trades request failed: %s", exc)
 
     return []
 
 
-def get_market_trades(condition_id, target_depth=500):
+def get_market_trades(condition_id, target_depth=1000, page_size=1000, lookback_hours=None):
     endpoint = f"{POLYMARKET_DATA_URL}/trades"
     total_trades = []
     current_offset = 0
+    page_size = max(1, min(int(page_size), 1000))
+    cutoff_timestamp = None
+
+    if lookback_hours is not None:
+        try:
+            cutoff_timestamp = int(time.time()) - int(lookback_hours * 3600)
+        except (TypeError, ValueError):
+            cutoff_timestamp = None
 
     while len(total_trades) < target_depth:
         params = {
             "market": condition_id,
-            "limit": 500,
+            "limit": page_size,
             "offset": current_offset,
         }
         try:
@@ -120,6 +131,17 @@ def get_market_trades(condition_id, target_depth=500):
         except requests.exceptions.RequestException as exc:
             logger.warning("Trade request failed at offset %s: %s", current_offset, exc)
             break
+
+    if cutoff_timestamp is not None:
+        filtered_trades = []
+        for trade in total_trades:
+            trade_timestamp = trade.get("timestamp")
+            try:
+                if trade_timestamp is not None and int(trade_timestamp) >= cutoff_timestamp:
+                    filtered_trades.append(trade)
+            except (TypeError, ValueError):
+                continue
+        total_trades = filtered_trades
 
     return total_trades[:target_depth]
 

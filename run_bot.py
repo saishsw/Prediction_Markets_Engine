@@ -1,4 +1,5 @@
 import logging
+import json
 
 from src.core.orchestrator import run_pipeline
 
@@ -10,4 +11,9 @@ logging.basicConfig(
 
 if __name__ == "__main__":
     logging.getLogger(__name__).info("Booting quant system integration test")
-    run_pipeline()
+    master_signals = run_pipeline()
+
+    if master_signals:
+        logging.getLogger(__name__).info(json.dumps(master_signals, indent=2))
+    else:
+        logging.getLogger(__name__).warning("No master_signals were generated")

@@ -106,23 +106,23 @@ class Whale_Alpha_Engine():
         ).reset_index()
 
         self.aggregated_df["avg_trade_size"] = self.aggregated_df["total_volume"] / self.aggregated_df["trade_count"]
-        self.aggregated_df["volume_skew"] = self.aggregated_df["net_volume"] / self.aggregated_df["total_volume"]
+        self.aggregated_df["volume_skew"] = np.where(
+            self.aggregated_df["total_volume"] != 0,
+            self.aggregated_df["net_volume"] / self.aggregated_df["total_volume"],
+            0.0,
+        )
 
-    def get_elite_whales(self):
+    def get_elite_whales(self, absolute_min=100.0, skew_threshold=0.85):
         if self.aggregated_df.empty:
             return pd.DataFrame()
 
-        min_volume = self.aggregated_df['total_volume'].quantile(0.97)
-        min_avg_size = self.aggregated_df['avg_trade_size'].quantile(0.95)
-
-        vol_pass = (self.aggregated_df["total_volume"] > min_volume).sum()
-        size_pass = (self.aggregated_df["avg_trade_size"] > min_avg_size).sum()
-        skew_pass = (self.aggregated_df["volume_skew"].abs() > 0.85).sum()
+        volume_floor = max(self.aggregated_df["total_volume"].quantile(0.95), absolute_min)
+        avg_trade_floor = max(self.aggregated_df["avg_trade_size"].quantile(0.95), absolute_min)
 
         whale_mask = (
-            (self.aggregated_df["total_volume"] > min_volume) &
-            (self.aggregated_df["avg_trade_size"] > min_avg_size) &
-            (self.aggregated_df["volume_skew"].abs() > 0.85) 
+            (self.aggregated_df["total_volume"] >= volume_floor) &
+            (self.aggregated_df["avg_trade_size"] >= avg_trade_floor) &
+            (self.aggregated_df["volume_skew"].abs() >= skew_threshold)
         )
 
         final_df = self.aggregated_df[whale_mask]
