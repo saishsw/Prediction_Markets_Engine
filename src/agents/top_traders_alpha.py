@@ -136,25 +136,3 @@ class Whale_Alpha_Engine():
             "whale_count": len(signals_list),
             "signals": signals_list
         }
-
-if __name__ == "__main__":
-    market_slug = "nba-cle-nyk-2026-05-19"
-    target_team = "Cavaliers"
-    target_condition_id = polymarket.get_market_condition_id(market_slug)
-    
-    if not target_condition_id:
-        sys.exit()
-    
-    raw_trades = polymarket.get_market_trades(target_condition_id, 1000)
-    
-    if not raw_trades:
-        sys.exit()
-    
-    preprocessor = Data_Preprocessor(raw_trades)
-    clean_df = preprocessor.clean_and_parse(target_outcome = target_team)
-    
-    engine = Whale_Alpha_Engine(clean_df)
-    engine.calculate_metrics()
-    
-    elite_whales = engine.get_elite_whales()
-    engine.generate_signals(elite_whales)

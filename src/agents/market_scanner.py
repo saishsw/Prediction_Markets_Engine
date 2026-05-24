@@ -14,14 +14,14 @@ from api import polymarket
 
 class Market_Scanner():
     def __init__(self):
-        self.endpoint = f"https://gamma-api.polymarket.com/events"
+        self.endpoint = f"https://gamma-api.polymarket.com/markets"
         self.params = {
             "limit" : 100, 
-            "order" : "volume_num",
+            "order" : "volumeNum",
             "closed" : False, 
         }
-        self.liquidity_quantile(0.75)
-        self.volume_quantile(0.75)
+        self.liquidity_quantile = 0.75
+        self.volume_quantile = 0.75
 
     def fetch_raw_markets(self):
         try:
@@ -42,7 +42,7 @@ class Market_Scanner():
         if not raw_data:
             return []
         
-        df = pd.dataFrame(raw_data)
+        df = pd.DataFrame(raw_data)
         df['liquidity'] = df['liquidity'].astype(float)
         df['volume'] = df['volume'].astype(float)
 
